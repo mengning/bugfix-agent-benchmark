@@ -103,45 +103,50 @@ For the two-repository Web Terminal setup, keep the Benchmark repository and
 the Bugfix Agent repository in the same DevStar workspace. The batch entrypoint
 starts one Agent command per case; it does not create Issues or PRs:
 
-\`\`\`text
+```text
 benchmark repository
   -> prepare case workspace
   -> run Agent command
   -> read artifact.json
   -> replay patch and score
-\`\`\`
+```
 
 The Agent command receives these environment variables:
 
 | Variable | Meaning |
 | --- | --- |
-| \`BENCHMARK_CASE_FILE\` | JSON file containing the current case |
-| \`BENCHMARK_WORKSPACE\` | Clean source workspace for the current case |
-| \`BENCHMARK_ARTIFACT_FILE\` | File the Agent must write |
-| \`BENCHMARK_CASE_ID\` | Current case identifier |
+| `BENCHMARK_CASE_FILE` | JSON file containing the current case |
+| `BENCHMARK_WORKSPACE` | Clean source workspace for the current case |
+| `BENCHMARK_ARTIFACT_FILE` | File the Agent must write |
+| `BENCHMARK_CASE_ID` | Current case identifier |
 
 The minimum artifact is:
 
-\`\`\`json
+```json
 {
   "patch": "diff --git ..."
 }
-\`\`\`
+```
 
 Run the batch entrypoint from the Benchmark repository:
 
-\`\`\`bash
-PYTHONPATH=src python3 scripts/run_agent_benchmark.py \\
+```bash
+export PYTHONPATH="$(pwd)/src:$(pwd)/../bugfix-agent"
+export BUGFIXAGENT_LLM_API_KEY='<api-key>'
+export BUGFIXAGENT_LLM_BASE_URL='<model-api-base-url>'
+export BUGFIXAGENT_LLM_MODEL='<model-name>'
+
+python3 scripts/run_agent_benchmark.py \\
   --manifest datasets/smoke/manifest.jsonl \\
   --repository-root . \\
-  --agent-command "python -m bugfix_agent.evaluate" \\
+  --agent-command "python3 -m bugfix_agent.evaluate" \\
   --results-dir results \\
   --run-id local-agent
-\`\`\`
+```
 
-The Agent command must read \`BENCHMARK_CASE_FILE\`, use
-\`BENCHMARK_WORKSPACE\` as its target repository, and write a unified diff to
-\`BENCHMARK_ARTIFACT_FILE\`. The verifier, not the Agent, determines the final
+The Agent command must read `BENCHMARK_CASE_FILE`, use
+`BENCHMARK_WORKSPACE` as its target repository, and write a unified diff to
+`BENCHMARK_ARTIFACT_FILE`. The verifier, not the Agent, determines the final
 case status.
 
 ### 4. Build official predictions and grade them

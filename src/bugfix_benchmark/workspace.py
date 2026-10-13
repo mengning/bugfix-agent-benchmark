@@ -23,6 +23,7 @@ def prepare_workspace(case: BenchmarkCase, destination: Path, repository_root: P
             raise WorkspaceError(f"local source_path does not exist: {source}")
         shutil.copytree(source, destination, ignore=_ignore_generated)
         _run(["git", "init", "--quiet"], destination, "cannot initialize local fixture workspace")
+        _run(["git", "add", "--all"], destination, "cannot stage local fixture baseline")
         return destination
     if not case.source_url:
         raise WorkspaceError(f"{case.case_id}: source_url or source_path is required")
