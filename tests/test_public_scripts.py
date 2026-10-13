@@ -35,6 +35,18 @@ class PublicScriptTests(unittest.TestCase):
         self.assertIn("--dry-run", completed.stdout)
         self.assertNotIn("/private/tmp", completed.stdout)
 
+    def test_batch_script_exposes_agent_command_cli(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/run_agent_benchmark.py"), "--help"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+
+        self.assertEqual(0, completed.returncode, completed.stdout)
+        self.assertIn("--agent-command", completed.stdout)
+        self.assertIn("--manifest", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

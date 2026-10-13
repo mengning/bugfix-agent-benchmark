@@ -97,6 +97,53 @@ patches/<instance_id>.patch
 The benchmark is Agent-neutral. A local CLI, HTTP service, or development
 platform may produce the patch as long as it follows this artifact contract.
 
+## Batch-run an Agent in the same workspace
+
+For the two-repository Web Terminal setup, keep the Benchmark repository and
+the Bugfix Agent repository in the same DevStar workspace. The batch entrypoint
+starts one Agent command per case; it does not create Issues or PRs:
+
+\`\`\`text
+benchmark repository
+  -> prepare case workspace
+  -> run Agent command
+  -> read artifact.json
+  -> replay patch and score
+\`\`\`
+
+The Agent command receives these environment variables:
+
+| Variable | Meaning |
+| --- | --- |
+| \`BENCHMARK_CASE_FILE\` | JSON file containing the current case |
+| \`BENCHMARK_WORKSPACE\` | Clean source workspace for the current case |
+| \`BENCHMARK_ARTIFACT_FILE\` | File the Agent must write |
+| \`BENCHMARK_CASE_ID\` | Current case identifier |
+
+The minimum artifact is:
+
+\`\`\`json
+{
+  "patch": "diff --git ..."
+}
+\`\`\`
+
+Run the batch entrypoint from the Benchmark repository:
+
+\`\`\`bash
+PYTHONPATH=src python3 scripts/run_agent_benchmark.py \\
+  --manifest datasets/smoke/manifest.jsonl \\
+  --repository-root . \\
+  --agent-command "python -m bugfix_agent.evaluate" \\
+  --results-dir results \\
+  --run-id local-agent
+\`\`\`
+
+The Agent command must read \`BENCHMARK_CASE_FILE\`, use
+\`BENCHMARK_WORKSPACE\` as its target repository, and write a unified diff to
+\`BENCHMARK_ARTIFACT_FILE\`. The verifier, not the Agent, determines the final
+case status.
+
 ### 4. Build official predictions and grade them
 
 Install the official harness from

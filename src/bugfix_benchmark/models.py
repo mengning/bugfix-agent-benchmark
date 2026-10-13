@@ -69,6 +69,19 @@ class BenchmarkCase:
             metadata={key: value for key, value in record.items() if key not in known},
         )
 
+    def evaluation_payload(self) -> Dict[str, Any]:
+        return {
+            "case_id": self.case_id,
+            "repository": self.repository,
+            "source_url": self.source_url,
+            "source_path": self.source_path,
+            "base_commit": self.base_commit,
+            "problem_statement": self.problem_statement,
+            "fail_to_pass": list(self.fail_to_pass),
+            "pass_to_pass": list(self.pass_to_pass),
+            "metadata": self.metadata,
+        }
+
 @dataclass(frozen=True)
 class AgentArtifact:
     patch: str
