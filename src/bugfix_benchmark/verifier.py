@@ -54,13 +54,33 @@ def verify_case(
     baseline = _run_commands(
         case.fail_to_pass, workspace, logs_dir, "baseline-fail-to-pass", command_timeout
     )
+    baseline_pass = _run_commands(
+        case.pass_to_pass, workspace, logs_dir, "baseline-pass-to-pass", command_timeout
+    )
     if any(result.passed for result in baseline):
         return CaseResult(
             case_id=case.case_id,
             status="baseline_invalid",
             fail_to_pass="already_passing",
             failure_reason="at least one FAIL_TO_PASS command already passed on the base workspace",
-            evidence=_evidence(patch_path, baseline=baseline),
+            evidence=_evidence(patch_path, baseline=baseline, baseline_pass=baseline_pass),
+        )
+    if not all(result.passed for result in baseline_pass):
+        return CaseResult(
+            case_id=case.case_id,
+            status="baseline_invalid",
+            pass_to_pass="already_failing",
+            failure_reason="at least one PASS_TO_PASS command failed on the base workspace",
+            evidence=_evidence(patch_path, baseline=baseline, baseline_pass=baseline_pass),
+        )
+
+    rejected_path = _rejected_patch_path(artifact.patch, workspace, case.protected_paths)
+    if rejected_path is not None:
+        return CaseResult(
+            case_id=case.case_id,
+            status="patch_rejected",
+            failure_reason=f"patch modifies generated or protected path: {rejected_path}",
+            evidence=_evidence(patch_path, baseline=baseline, baseline_pass=baseline_pass),
         )
 
     applied = subprocess.run(
@@ -80,7 +100,7 @@ def verify_case(
             case_id=case.case_id,
             status="patch_apply_failed",
             failure_reason=applied.stdout.strip() or "git apply rejected the patch",
-            evidence=_evidence(patch_path, baseline=baseline, apply_log=apply_log),
+            evidence=_evidence(patch_path, baseline=baseline, baseline_pass=baseline_pass, apply_log=apply_log),
         )
 
     fail_results = _run_commands(
@@ -93,7 +113,8 @@ def verify_case(
             fail_to_pass="failed",
             failure_reason="one or more FAIL_TO_PASS commands still fail after applying the patch",
             evidence=_evidence(
-                patch_path, baseline=baseline, fail_to_pass=fail_results, apply_log=apply_log
+                patch_path, baseline=baseline, baseline_pass=baseline_pass,
+                fail_to_pass=fail_results, apply_log=apply_log
             ),
         )
 
@@ -110,6 +131,7 @@ def verify_case(
             evidence=_evidence(
                 patch_path,
                 baseline=baseline,
+                baseline_pass=baseline_pass,
                 fail_to_pass=fail_results,
                 pass_to_pass=pass_results,
                 apply_log=apply_log,
@@ -124,11 +146,39 @@ def verify_case(
         evidence=_evidence(
             patch_path,
             baseline=baseline,
+            baseline_pass=baseline_pass,
             fail_to_pass=fail_results,
             pass_to_pass=pass_results,
             apply_log=apply_log,
         ),
     )
+
+
+def _rejected_patch_path(patch: str, workspace: Path, protected_paths: Iterable[str]) -> str | None:
+    listed = subprocess.run(
+        ["git", "apply", "--numstat", "-z"],
+        cwd=str(workspace),
+        input=patch.encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if listed.returncode != 0:
+        return None  # git apply below reports malformed patches as patch_apply_failed
+    protected = tuple(path.rstrip("/") for path in protected_paths)
+    generated = {".git", ".benchmark", "results", "logs", "__pycache__", ".pytest_cache", ".venv"}
+    for record in listed.stdout.split(b"\0"):
+        if not record:
+            continue
+        fields = record.split(b"\t", 2)
+        if len(fields) != 3 or not fields[2]:
+            return "<unsupported patch path>"
+        path = fields[2].decode("utf-8", errors="replace")
+        parts = Path(path).parts
+        if any(part in generated for part in parts) or path.endswith((".log", ".pyc")):
+            return path
+        if any(path == item or path.startswith(item + "/") for item in protected):
+            return path
+    return None
 
 
 def _run_commands(
@@ -173,6 +223,7 @@ def _evidence(
     patch_path: Path,
     *,
     baseline: Iterable[CommandResult] = (),
+    baseline_pass: Iterable[CommandResult] = (),
     fail_to_pass: Iterable[CommandResult] = (),
     pass_to_pass: Iterable[CommandResult] = (),
     apply_log: Path = None,
@@ -181,6 +232,7 @@ def _evidence(
         "patch_path": patch_path.name,
         "patch_bytes": patch_path.stat().st_size,
         "baseline_fail_to_pass": [item.as_dict() for item in baseline],
+        "baseline_pass_to_pass": [item.as_dict() for item in baseline_pass],
         "fail_to_pass": [item.as_dict() for item in fail_to_pass],
         "pass_to_pass": [item.as_dict() for item in pass_to_pass],
     }

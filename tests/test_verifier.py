@@ -38,13 +38,13 @@ class CalcTests(unittest.TestCase):
 """
 
 
-def unified_patch(before: str, after: str) -> str:
+def unified_patch(before: str, after: str, path: str = "calc.py") -> str:
     return "".join(
         difflib.unified_diff(
             before.splitlines(keepends=True),
             after.splitlines(keepends=True),
-            fromfile="a/calc.py",
-            tofile="b/calc.py",
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
         )
     )
 
@@ -105,6 +105,54 @@ class VerifierTests(unittest.TestCase):
         result = self.verify(unified_patch(FIXED, REGRESSED))
 
         self.assertEqual("baseline_invalid", result.status)
+
+    def test_rejects_case_whose_pass_to_pass_is_already_red(self) -> None:
+        (self.source / "test_calc.py").write_text(
+            TESTS.replace("self.assertEqual(0, average([]))", "self.assertEqual(1, average([]))"),
+            encoding="utf-8",
+        )
+
+        result = self.verify(unified_patch(BUGGY, FIXED))
+
+        self.assertEqual("baseline_invalid", result.status)
+        self.assertEqual("already_failing", result.pass_to_pass)
+        self.assertFalse((self.root / "run/logs/patch-apply.log").exists())
+
+    def test_rejects_generated_log_file_in_patch(self) -> None:
+        log_patch = (
+            "diff --git a/logs/agent.log b/logs/agent.log\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            "+++ b/logs/agent.log\n"
+            "@@ -0,0 +1 @@\n"
+            "+agent output\n"
+        )
+
+        result = self.verify(unified_patch(BUGGY, FIXED) + log_patch)
+
+        self.assertEqual("patch_rejected", result.status)
+        self.assertIn("logs/agent.log", result.failure_reason)
+        self.assertFalse((self.root / "run/logs/patch-apply.log").exists())
+
+    def test_rejects_patch_that_changes_protected_test(self) -> None:
+        self.case = BenchmarkCase.from_record(
+            {
+                **self.case.evaluation_payload(),
+                "protected_paths": ["test_calc.py"],
+            }
+        )
+        tampered = TESTS.replace(
+            "self.assertEqual(5 / 3, average([1, 2, 2]))",
+            "self.assertEqual(1, average([1, 2, 2]))",
+        )
+
+        result = self.verify(
+            unified_patch(BUGGY, FIXED)
+            + unified_patch(TESTS, tampered, "test_calc.py")
+        )
+
+        self.assertEqual("patch_rejected", result.status)
+        self.assertIn("test_calc.py", result.failure_reason)
 
     def test_reports_patch_apply_failure(self) -> None:
         result = self.verify("diff --git a/missing.py b/missing.py\n--- a/missing.py\n+++ b/missing.py\n@@ -1 +1 @@\n-x\n+y\n")

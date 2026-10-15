@@ -23,6 +23,7 @@ class BenchmarkCase:
     problem_statement: str
     fail_to_pass: Tuple[str, ...]
     pass_to_pass: Tuple[str, ...] = ()
+    protected_paths: Tuple[str, ...] = ()
     source_url: str = ""
     source_path: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -39,6 +40,7 @@ class BenchmarkCase:
             source_url = f"https://github.com/{repository.removesuffix('.git')}.git"
         fail_to_pass = _commands(record, "fail_to_pass", "FAIL_TO_PASS")
         pass_to_pass = _commands(record, "pass_to_pass", "PASS_TO_PASS")
+        protected_paths = _commands(record, "protected_paths", "PROTECTED_PATHS")
         if not case_id:
             raise ValueError("case_id or instance_id is required")
         if not repository:
@@ -56,6 +58,7 @@ class BenchmarkCase:
             "problem_statement", "issue", "source_path", "source_url",
             "clone_url", "fail_to_pass", "FAIL_TO_PASS", "pass_to_pass",
             "PASS_TO_PASS",
+            "protected_paths", "PROTECTED_PATHS",
         }
         return cls(
             case_id=case_id,
@@ -64,6 +67,7 @@ class BenchmarkCase:
             problem_statement=problem_statement,
             fail_to_pass=fail_to_pass,
             pass_to_pass=pass_to_pass,
+            protected_paths=protected_paths,
             source_url=source_url,
             source_path=source_path,
             metadata={key: value for key, value in record.items() if key not in known},
@@ -79,6 +83,7 @@ class BenchmarkCase:
             "problem_statement": self.problem_statement,
             "fail_to_pass": list(self.fail_to_pass),
             "pass_to_pass": list(self.pass_to_pass),
+            "protected_paths": list(self.protected_paths),
             "metadata": self.metadata,
         }
 
