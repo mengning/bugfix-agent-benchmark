@@ -34,6 +34,13 @@ represent the full SWE-bench Lite suite and must not be reported as official
 leaderboard scores. `scripts/fetch_swe_bench.py --all` downloads the complete
 300-case test split into the ignored `.benchmark/` directory.
 
+`original-cases.txt` is a separate research selection of three upstream cases.
+The [survey](BUGFIX_DATASET_SURVEY.md) records their repository context,
+defect mechanism, capability hypotheses, and limits of those interpretations.
+The selection is not an independently reproduced or statistically representative
+Bugfix benchmark; it uses the same official-data acquisition path as other
+SWE-bench Lite selections.
+
 ## Reproducibility requirements
 
 Every public evaluation set must record:

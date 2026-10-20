@@ -64,7 +64,7 @@ python3 -m json.tool results/<run-id>/cases/pagination-boundary/result.json
 另外两类资源分开使用：
 
 - `datasets/smoke/`：提供已知补丁，检查评分器，不计作 Agent 能力分数。
-- `datasets/swe-bench-lite/`：保存业界用例 ID 选择，下载与官方评分用于可选对照。Bugfix-v1 不依赖它，也不需要官方 harness 或 Docker-in-Docker。
+- `datasets/swe-bench-lite/`：保存业界用例 ID 选择，下载与官方评分用于可选对照。其中 `original-cases.txt` 对应[数据集构成调查报告](docs/BUGFIX_DATASET_SURVEY.md)中的三条真实上游研究样例；它们不是已独立复现的正式专项集。Bugfix-v1 不依赖它，也不需要官方 harness 或 Docker-in-Docker。
 
 ## 文件架构
 
