@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from bugfix_benchmark.agent_runner import CommandAgentAdapter, command_from_string
 from bugfix_benchmark.runner import _new_run_id, _safe_name
-from bugfix_benchmark.swebench import official_cases, read_instance_ids, select_records
+from bugfix_benchmark.swebench import official_cases, read_instance_ids, select_records, build_predictions, write_jsonl
 from bugfix_benchmark.workspace import prepare_workspace
 
 
@@ -29,6 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-cases", type=int)
     parser.add_argument("--agent-timeout", type=float, default=900.0)
     parser.add_argument("--keep-workspaces", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="retry failures and skip completed patches in an existing run")
+    parser.add_argument("--model-name", default="bugfix-agent", help="model_name_or_path in the official predictions file")
     return parser
 
 
@@ -60,17 +62,54 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     run_dir = (args.results_dir / run_id).resolve()
     patches_dir = run_dir / "patches"
     cases_dir = run_dir / "cases"
-    run_dir.mkdir(parents=True, exist_ok=False)
-    patches_dir.mkdir()
-    cases_dir.mkdir()
+    run_dir.mkdir(parents=True, exist_ok=args.resume)
+    patches_dir.mkdir(exist_ok=args.resume)
+    cases_dir.mkdir(exist_ok=args.resume)
     command = command_from_string(args.agent_command)
     results = []
+    instance_ids = tuple(case.case_id for case in cases)
+    instances_path = run_dir / "instances.txt"
+    if args.resume and instances_path.is_file() and read_instance_ids(instances_path) != instance_ids:
+        raise ValueError("resume instance selection differs from the existing run")
+    previous_summary = run_dir / "run.json"
+    if args.resume and previous_summary.is_file():
+        previous = json.loads(previous_summary.read_text(encoding="utf-8"))
+        if previous.get("model_name") != args.model_name or previous.get("dataset_file") != str(args.dataset_file):
+            raise ValueError("resume model or dataset differs from the existing run")
+    instances_path.write_text("".join(f"{case_id}\n" for case_id in instance_ids), encoding="utf-8")
+    skipped_existing = 0
+
+    def save_progress() -> dict[str, object]:
+        completed_ids = [case_id for case_id in instance_ids if (patches_dir / f"{_safe_name(case_id)}.patch").is_file()]
+        predictions = build_predictions(completed_ids, patches_dir, args.model_name, allow_empty=True)
+        prediction_path = run_dir / "predictions.jsonl"
+        temporary_predictions = run_dir / "predictions.jsonl.tmp"
+        write_jsonl(predictions, temporary_predictions)
+        temporary_predictions.replace(prediction_path)
+        generated = sum(result["status"] == "patch_generated" for result in results)
+        summary = {
+            "run_id": run_id, "dataset_file": str(args.dataset_file), "model_name": args.model_name, "total": len(cases),
+            "patches_generated": generated, "agent_failed": sum(result["status"] == "agent_failed" for result in results),
+            "skipped_existing": skipped_existing, "cases": results,
+        }
+        temporary_summary = run_dir / "run.json.tmp"
+        temporary_summary.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary_summary.replace(run_dir / "run.json")
+        return summary
 
     for case in cases:
         case_dir = cases_dir / _safe_name(case.case_id)
-        case_dir.mkdir()
+        case_dir.mkdir(exist_ok=args.resume)
         workspace = case_dir / "workspace"
         patch_path = patches_dir / f"{_safe_name(case.case_id)}.patch"
+        result_path = case_dir / "result.json"
+        if args.resume and result_path.is_file() and patch_path.is_file():
+            previous = json.loads(result_path.read_text(encoding="utf-8"))
+            if previous.get("status") == "patch_generated" and patch_path.stat().st_size:
+                results.append(previous)
+                skipped_existing += 1
+                save_progress()
+                continue
         try:
             prepare_workspace(case, workspace, ROOT)
             artifact = CommandAgentAdapter(
@@ -89,26 +128,12 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             if not args.keep_workspaces and workspace.is_dir():
                 shutil.rmtree(workspace)
         results.append(result)
-        (case_dir / "result.json").write_text(
+        result_path.write_text(
             json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
+        save_progress()
 
-    (run_dir / "instances.txt").write_text(
-        "".join(f"{case.case_id}\n" for case in cases), encoding="utf-8"
-    )
-    generated = sum(result["status"] == "patch_generated" for result in results)
-    summary: dict[str, object] = {
-        "run_id": run_id,
-        "dataset_file": str(args.dataset_file),
-        "total": len(cases),
-        "patches_generated": generated,
-        "agent_failed": len(cases) - generated,
-        "cases": results,
-    }
-    (run_dir / "run.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    return summary
+    return save_progress()
 
 
 def main() -> int:

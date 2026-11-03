@@ -1,0 +1,2 @@
+# Requires manual review: several target test IDs do not obviously match the redirect-state report.
+psf__requests-1963

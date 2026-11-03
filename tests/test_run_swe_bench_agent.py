@@ -61,6 +61,16 @@ class RunSweBenchAgentTests(unittest.TestCase):
             self.assertEqual("owner__repo-1\n", (run_dir / "instances.txt").read_text(encoding="utf-8"))
             self.assertFalse((run_dir / "score.json").exists())
 
+            predictions = [json.loads(line) for line in (run_dir / "predictions.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual("owner__repo-1", predictions[0]["instance_id"])
+            self.assertIn("+after", predictions[0]["model_patch"])
+
+            args.resume = True
+            agent.write_text("raise RuntimeError('must not run again')\n", encoding="utf-8")
+            resumed = run(args)
+            self.assertEqual(1, resumed["patches_generated"])
+            self.assertEqual(1, resumed["skipped_existing"])
+
     def test_agent_failure_keeps_empty_patch_for_official_denominator(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -84,6 +94,29 @@ class RunSweBenchAgentTests(unittest.TestCase):
 
             self.assertEqual(1, result["agent_failed"])
             self.assertEqual("", (root / "results" / "failed-run" / "patches" / "owner__repo-1.patch").read_text(encoding="utf-8"))
+
+    def test_resume_retries_failed_case_and_replaces_empty_prediction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+            (source / "value.txt").write_text("before\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(source), "add", "value.txt"], check=True)
+            subprocess.run(["git", "-C", str(source), "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--quiet", "-m", "baseline"], check=True)
+            commit = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
+            dataset = root / "cases.jsonl"
+            dataset.write_text(json.dumps({"instance_id": "owner__repo-1", "repo": "owner/repo", "source_url": str(source), "base_commit": commit, "problem_statement": "Fix", "FAIL_TO_PASS": "[]", "PASS_TO_PASS": "[]"}) + "\n", encoding="utf-8")
+            agent = root / "agent.py"
+            agent.write_text("raise RuntimeError('fail first')\n", encoding="utf-8")
+            args = build_parser().parse_args(["--dataset-file", str(dataset), "--agent-command", f"{sys.executable} {agent}", "--results-dir", str(root / "results"), "--run-id", "retry-run"])
+            self.assertEqual(1, run(args)["agent_failed"])
+            agent.write_text("import json, os, pathlib\npathlib.Path(os.environ['BENCHMARK_ARTIFACT_FILE']).write_text(json.dumps({'patch':'diff --git a/value.txt b/value.txt\\n--- a/value.txt\\n+++ b/value.txt\\n@@ -1 +1 @@\\n-before\\n+after\\n'}))\n", encoding="utf-8")
+            args.resume = True
+            self.assertEqual(1, run(args)["patches_generated"])
+            predictions = [json.loads(line) for line in (root / "results" / "retry-run" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(1, len(predictions))
+            self.assertIn("+after", predictions[0]["model_patch"])
 
 
 if __name__ == "__main__":

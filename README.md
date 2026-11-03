@@ -239,6 +239,45 @@ python3 scripts/run_agent_benchmark.py \
 
 ## 可选：SWE-bench 对照
 
+### 批量产出，云端评分
+
+SWE-bench Lite 的正式对照使用完整 `test` split（300 条）。先在 DevStar 的 Bugfix Agent 实例 Web Terminal 中下载数据，配置 CLI 的 `BUGFIXAGENT_LLM_API_KEY`、`BUGFIXAGENT_LLM_BASE_URL`、`BUGFIXAGENT_LLM_MODEL`，并确保 `PYTHONPATH` 指向当前实例的 Bugfix Agent 模板目录。模型密钥不要写入仓库或结果文件。随后在 Benchmark 仓库根目录执行：
+
+```bash
+python3 scripts/fetch_swe_bench.py --all \
+  --output .benchmark/datasets/swe-bench-lite-all.jsonl \
+  --ids-output .benchmark/datasets/swe-bench-lite-all.txt
+
+python3 scripts/run_swe_bench_agent.py \
+  --dataset-file .benchmark/datasets/swe-bench-lite-all.jsonl \
+  --instances-file .benchmark/datasets/swe-bench-lite-all.txt \
+  --agent-command "/ABSOLUTE/PATH/TO/python -m bugfix_agent.evaluate" \
+  --model-name bugfix-agent \
+  --run-id swe-lite-full
+```
+
+Runner 每条结束后更新 `results/swe-lite-full/run.json`、`patches/` 和官方格式的 `predictions.jsonl`。中断后用**相同参数、相同 run-id**加 `--resume`：已成功产出且补丁非空的用例跳过，失败或空补丁用例重试。`--resume` 会拒绝不同的数据文件、模型名或用例选择。Runner 不会自动重试失败用例；每次续跑可能再次消耗模型额度。`predictions.jsonl` 包含空补丁，只有 300 条齐全时才能作为全量结果。
+
+在上传云端前检查：
+
+```bash
+python3 -c 'import json; from pathlib import Path; p=Path("results/swe-lite-full/predictions.jsonl"); rows=[json.loads(x) for x in p.read_text().splitlines()]; ids=[r["instance_id"] for r in rows]; print("total",len(ids),"unique",len(set(ids)),"nonempty",sum(bool(r["model_patch"].strip()) for r in rows)); assert len(ids)==len(set(ids))==300'
+```
+
+把这一份 `predictions.jsonl` 复制到有 Docker 的 **x86_64 Linux** 评分机，然后在评分机用官方 SWE-bench harness 运行：
+
+```bash
+python3 -m swebench.harness.run_evaluation \
+  --dataset_name SWE-bench/SWE-bench_Lite \
+  --predictions_path predictions.jsonl \
+  --max_workers 4 \
+  --run_id swe-lite-full
+```
+
+官方报告位于 `logs/evaluation/swe-lite-full/results.json`。只有 `completed_instances` 与目标用例数一致、环境错误为零时，`resolved_instances/300` 才可用作完整对照分数。把文件放到云评分机运行不等于提交到 SWE-bench 官方排行榜。Apple Silicon 本地 Docker 默认是 ARM64，官方预构建的 `x86_64` 评测镜像可能无法直接拉取。
+
+当前 SWE-bench 入口是 Bugfix Agent 的 CLI，不经过 DevStar Runtime 事件派发；DevStar 在此提供实例与工作区。请在更新后的 Agent 模板实例里运行，旧实例不会自动加载新补丁导出逻辑。
+
 上游数据下载、patch 生成和官方验证使用独立脚本。以选取 30 个 Lite 用例为例：
 
 ```bash
@@ -268,6 +307,18 @@ python3 scripts/grade_swe_bench.py \
 ```
 
 运行 Agent 前须按上一节安装并配置 CLI。最后一步先查看官方命令；实际评分需另行安装 [SWE-bench harness](https://github.com/SWE-bench/SWE-bench) 和 Docker 运行环境，再去掉 `--dry-run`。下载时使用 `--all` 可获取完整 Lite 测试集；生成 patch 时不指定选择文件，评分时使用该次运行生成的 `instances.txt`。官方对照与 Bugfix-v1 分数分别报告。
+
+## 跨来源选题研究
+
+[选题目的与底层逻辑](docs/MULTI_SOURCE_SELECTION.md)对照 SWE-bench 系列、
+Defects4J、BugsInPy、BugsJS 等来源；[候选题记录](datasets/cross-source/README.md)
+逐题列出为什么考虑它、能测什么、证据边界和下一道验证闸门。该候选文件
+不是可运行清单，不能据此计算跨来源分数。现有 SWE-bench Lite 官方 300 题
+对照和 84 题研究清单保持独立。
+
+[情境分类与扩题说明](docs/SCENARIO_BENCHMARK_DESIGN.md)把缺陷机制、任务跨度、
+运行情境作为独立维度，整理了 176 个跨来源研究候选。这个数量不是有效评分
+分母；参考补丁的多文件代理指标也不能直接证明题目是长任务。
 
 ## 维护与自检
 
