@@ -237,46 +237,56 @@ python3 scripts/run_agent_benchmark.py \
 
 此路径的模型凭据由对应 CLI 配置，不使用平台自动注入的模型配置。
 
+为降低凭据进入结果文件的风险，Runner 不保存 Agent 标准输出、完整启动命令或 DevStar HTTP 错误正文。不要把密钥作为命令行参数或仓库 URL 的一部分。生成的补丁、Agent 自行写入的产物以及测试输出仍可能包含敏感信息，分享前必须检查。命令模式和本地验证会执行仓库代码，不提供安全沙箱；仅在可信、隔离的环境中使用，避免将生产凭据暴露给待测代码。
+
 ## 可选：SWE-bench 对照
 
-### 批量产出，云端评分
+### 使用 DevStar 生成补丁并评分
 
-SWE-bench Lite 的正式对照使用完整 `test` split（300 条）。先在 DevStar 的 Bugfix Agent 实例 Web Terminal 中下载数据，配置 CLI 的 `BUGFIXAGENT_LLM_API_KEY`、`BUGFIXAGENT_LLM_BASE_URL`、`BUGFIXAGENT_LLM_MODEL`，并确保 `PYTHONPATH` 指向当前实例的 Bugfix Agent 模板目录。模型密钥不要写入仓库或结果文件。随后在 Benchmark 仓库根目录执行：
+在 DevStar 中的 Bugfix Agent 实例 Web Terminal 执行以下命令。它使用该实例已有的平台凭据与 DevStar 模型配置；无需在命令中输入模型 API Key。需要配套 DevStar 支持派发与结果接口、Agent 支持 `/evaluate-case`，并确保该实例可访问 Git 仓库及基准提交。请在可信、隔离的运行环境中执行。
+
+准备数据：
 
 ```bash
+python3 -m pip install -e '.[datasets]'
 python3 scripts/fetch_swe_bench.py --all \
-  --output .benchmark/datasets/swe-bench-lite-all.jsonl \
-  --ids-output .benchmark/datasets/swe-bench-lite-all.txt
+  --output .benchmark/datasets/swe-bench-lite-test.jsonl \
+  --ids-output .benchmark/datasets/swe-bench-lite-test.txt
+```
 
+先试跑一题。生成阶段会调用 DevStar 配置的模型并产生费用：
+
+```bash
 python3 scripts/run_swe_bench_agent.py \
-  --dataset-file .benchmark/datasets/swe-bench-lite-all.jsonl \
-  --instances-file .benchmark/datasets/swe-bench-lite-all.txt \
-  --agent-command "/ABSOLUTE/PATH/TO/python -m bugfix_agent.evaluate" \
-  --model-name bugfix-agent \
-  --run-id swe-lite-full
+  --dataset-file .benchmark/datasets/swe-bench-lite-test.jsonl \
+  --adapter devstar-runtime --max-cases 1 \
+  --model-name bugfix-agent --run-id swe-lite-smoke
 ```
 
-Runner 每条结束后更新 `results/swe-lite-full/run.json`、`patches/` 和官方格式的 `predictions.jsonl`。中断后用**相同参数、相同 run-id**加 `--resume`：已成功产出且补丁非空的用例跳过，失败或空补丁用例重试。`--resume` 会拒绝不同的数据文件、模型名或用例选择。Runner 不会自动重试失败用例；每次续跑可能再次消耗模型额度。`predictions.jsonl` 包含空补丁，只有 300 条齐全时才能作为全量结果。
-
-在上传云端前检查：
+完整 300 题使用新运行目录；生成过程中可记录 `results/swe-lite-full/run.json` 和 `predictions.jsonl`：
 
 ```bash
-python3 -c 'import json; from pathlib import Path; p=Path("results/swe-lite-full/predictions.jsonl"); rows=[json.loads(x) for x in p.read_text().splitlines()]; ids=[r["instance_id"] for r in rows]; print("total",len(ids),"unique",len(set(ids)),"nonempty",sum(bool(r["model_patch"].strip()) for r in rows)); assert len(ids)==len(set(ids))==300'
+python3 scripts/run_swe_bench_agent.py \
+  --dataset-file .benchmark/datasets/swe-bench-lite-test.jsonl \
+  --adapter devstar-runtime \
+  --model-name bugfix-agent --run-id swe-lite-full
 ```
 
-把这一份 `predictions.jsonl` 复制到有 Docker 的 **x86_64 Linux** 评分机，然后在评分机用官方 SWE-bench harness 运行：
+中断后使用同一组参数追加 `--resume`。已生成非空补丁的题目会跳过；DevStar 任务发生异常时会保留其工作区，并默认不自动重试，以免覆盖仍在运行的任务。确认对应平台事件已经停止后，才使用 `--resume --retry-failed`。数据集文件内容、用例列表、模型标签或 adapter 不一致时禁止续跑。模型标签用于记录，不会强制改变平台实际模型；应在 DevStar 设置中核对模型。
+
+生成阶段从 Git 获取基准源码并重建仅有基线快照的本地历史，避免将上游后续修复提交暴露给 Agent。该入口**不自动准备逐题官方 Docker 测试环境，也不自动执行官方评分**；Agent 使用实例内可用的工具与依赖，其生成条件与历史 DevStar 300 题运行不完全相同，不能视作同一次实验的复现。
+
+准备可访问官方实例镜像的 Docker 评分环境，安装 `swebench==4.1.0`，将上述结果目录复制过去后运行：
 
 ```bash
-python3 -m swebench.harness.run_evaluation \
-  --dataset_name SWE-bench/SWE-bench_Lite \
-  --predictions_path predictions.jsonl \
-  --max_workers 4 \
-  --run_id swe-lite-full
+python3 scripts/grade_swe_bench.py \
+  --instances-file results/swe-lite-full/instances.txt \
+  --patch-dir results/swe-lite-full/patches \
+  --model-name bugfix-agent --run-id swe-lite-full \
+  --max-workers 1 --allow-empty
 ```
 
-官方报告位于 `logs/evaluation/swe-lite-full/results.json`。只有 `completed_instances` 与目标用例数一致、环境错误为零时，`resolved_instances/300` 才可用作完整对照分数。把文件放到云评分机运行不等于提交到 SWE-bench 官方排行榜。Apple Silicon 本地 Docker 默认是 ARM64，官方预构建的 `x86_64` 评测镜像可能无法直接拉取。
-
-当前 SWE-bench 入口是 Bugfix Agent 的 CLI，不经过 DevStar Runtime 事件派发；DevStar 在此提供实例与工作区。请在更新后的 Agent 模板实例里运行，旧实例不会自动加载新补丁导出逻辑。
+评分器会生成 `bugfix-agent.swe-lite-full.json` 及标准化的 `results/swe-lite-full/score.json`；逐题日志位于 `logs/evaluation/swe-lite-full/`。`--allow-empty` 让失败题目保留在分母中。支持的操作系统和 CPU 架构取决于 Docker、官方镜像及 SWE-bench 版本；优先在兼容的 Linux Docker 环境验证，其他环境需自行确认镜像可运行。运行官方 harness 不等于提交官方榜单。
 
 上游数据下载、patch 生成和官方验证使用独立脚本。以选取 30 个 Lite 用例为例：
 

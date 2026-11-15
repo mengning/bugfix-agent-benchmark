@@ -58,6 +58,25 @@ class CommandAgentAdapterTests(unittest.TestCase):
         self.assertEqual("command", artifact.adapter)
         self.assertEqual(str(workspace), artifact.metadata["workspace"])
 
+    def test_does_not_persist_subprocess_output_or_secrets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            def adapter(code):
+                return CommandAgentAdapter(command=["python3", "-c", code],
+                    case_file=root / "case.json", workspace=workspace,
+                    artifact_file=root / "artifact.json")
+            secret = "example-secret-not-for-logs"
+            ok = adapter("import json, os; print(%r); json.dump({'patch': %r}, open(os.environ['BENCHMARK_ARTIFACT_FILE'], 'w'))" % (secret, PATCH))
+            artifact = ok.run(make_case())
+            self.assertNotIn(secret, json.dumps(artifact.metadata))
+            failed = adapter("import sys; print(%r); sys.exit(3)" % secret)
+            with self.assertRaises(RuntimeError) as caught:
+                failed.run(make_case())
+            self.assertIn("code 3", str(caught.exception))
+            self.assertNotIn(secret, str(caught.exception))
+
     def test_rejects_artifact_without_patch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

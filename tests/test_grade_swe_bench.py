@@ -12,6 +12,29 @@ from scripts import grade_swe_bench
 
 
 class GradeSweBenchTests(unittest.TestCase):
+    def test_default_uses_official_model_and_run_report_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ids = root / "ids.txt"
+            ids.write_text("owner__repo-1\n")
+            patches = root / "patches"
+            patches.mkdir()
+            (patches / "owner__repo-1.patch").write_text("diff --git a/a b/a\n")
+            report = root / "owner__model.trial.json"
+            report.write_text(json.dumps({"total_instances": 1, "resolved_ids": ["owner__repo-1"]}))
+            argv = ["grade_swe_bench.py", "--instances-file", str(ids), "--patch-dir", str(patches),
+                    "--model-name", "owner/model", "--run-id", "trial",
+                    "--predictions-path", str(root / "predictions.jsonl"), "--score-path", str(root / "score.json")]
+            import os
+            original = os.getcwd()
+            try:
+                os.chdir(root)
+                with patch.object(sys, "argv", argv), patch.object(grade_swe_bench.subprocess, "run", return_value=types.SimpleNamespace(returncode=0)):
+                    self.assertEqual(0, grade_swe_bench.main())
+            finally:
+                os.chdir(original)
+            self.assertEqual(1, json.loads((root / "score.json").read_text())["passed"])
+
     def test_official_report_becomes_score_with_empty_agent_patch_counted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

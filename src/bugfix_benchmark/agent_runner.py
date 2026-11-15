@@ -62,14 +62,12 @@ class CommandAgentAdapter:
                 timeout=self.timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
-            output = str(exc.stdout or "")
             raise RuntimeError(
-                f"Agent command timed out after {self.timeout_seconds:g}s: {output}"
-            ) from exc
+                f"Agent command timed out after {self.timeout_seconds:g}s (output omitted)"
+            ) from None
         if completed.returncode != 0:
             raise RuntimeError(
-                f"Agent command exited with code {completed.returncode}: "
-                f"{completed.stdout.strip()}"
+                f"Agent command exited with code {completed.returncode} (output omitted)"
             )
         if not self.artifact_file.is_file():
             raise RuntimeError(
@@ -93,7 +91,6 @@ class CommandAgentAdapter:
                 "case_file": str(self.case_file),
                 "artifact_file": str(self.artifact_file),
                 "workspace": str(self.workspace),
-                "agent_stdout": completed.stdout[-4000:],
             },
         )
 

@@ -45,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path(".benchmark/predictions.jsonl"),
     )
-    parser.add_argument("--report-path", type=Path, help="official harness results.json path")
+    parser.add_argument("--report-path", type=Path, help="official harness summary JSON path")
     parser.add_argument("--score-path", type=Path, help="output normalized score.json path")
     parser.add_argument(
         "--dry-run",
@@ -77,7 +77,7 @@ def main() -> int:
     exit_code = subprocess.run(command, check=False).returncode
     if exit_code:
         return exit_code
-    report_path = args.report_path or Path("logs/evaluation") / args.run_id / "results.json"
+    report_path = args.report_path or Path(f"{args.model_name.replace('/', '__')}.{args.run_id}.json")
     report = json.loads(report_path.read_text(encoding="utf-8"))
     if not isinstance(report, dict):
         raise ValueError(f"official harness report must be an object: {report_path}")

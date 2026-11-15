@@ -30,7 +30,7 @@ def prepare_workspace(case: BenchmarkCase, destination: Path, repository_root: P
     _run(
         ["git", "clone", "--quiet", "--no-checkout", case.source_url, str(destination)],
         repository_root,
-        f"cannot clone {case.source_url}",
+        "cannot clone source repository",
     )
     _run(
         ["git", "checkout", "--quiet", "--detach", case.base_commit],
@@ -50,5 +50,4 @@ def _run(command: list[str], cwd: Path, message: str) -> None:
         command, cwd=str(cwd), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
     if completed.returncode != 0:
-        detail = completed.stdout.strip()
-        raise WorkspaceError(f"{message}: {detail}" if detail else message)
+        raise WorkspaceError(f"{message} (exit code {completed.returncode}; output omitted)")

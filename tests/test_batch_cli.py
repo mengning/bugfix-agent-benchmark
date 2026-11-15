@@ -89,6 +89,8 @@ class BatchCliTests(unittest.TestCase):
 
             score = run(args)
 
+            self.assertEqual("[omitted]", score["agent_command"])
+            self.assertNotIn(args.agent_command, json.dumps(score))
             self.assertEqual(1, score["total"])
             self.assertEqual(0, score["passed"])
             self.assertEqual("baseline_invalid", score["cases"][0]["status"])
