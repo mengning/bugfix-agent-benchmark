@@ -74,7 +74,7 @@ class DevStarRuntimeAdapter:
                     raise RuntimeError("DevStar Agent returned no patch")
                 return AgentArtifact(patch=patch, adapter=self.name, metadata={"event_id": event_id})
             if status == "failed":
-                raise RuntimeError(f"DevStar Agent event failed: {event.get('error') or 'unknown error'}")
+                raise RuntimeError(f"DevStar Agent event {event_id} failed; inspect the event in DevStar")
             if status not in {"queued", "running"}:
                 raise RuntimeError(f"unexpected DevStar Agent event status: {status or '<empty>'}")
             if time.monotonic() >= deadline:
@@ -93,10 +93,9 @@ class DevStarRuntimeAdapter:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
         except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:500]
-            raise RuntimeError(f"DevStar {method} {path} returned HTTP {exc.code}: {detail}") from exc
+            raise RuntimeError(f"DevStar {method} {path} returned HTTP {exc.code} (response omitted)") from None
         except URLError as exc:
-            raise RuntimeError(f"DevStar {method} {path} failed: {exc.reason}") from exc
+            raise RuntimeError(f"DevStar {method} {path} failed: connection error") from None
 
 
 def runtime_adapter_from_environment(workspace: Path, *, timeout_seconds: float = 900.0) -> DevStarRuntimeAdapter:

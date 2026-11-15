@@ -118,7 +118,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "run_id": run_id,
         "manifest": str(args.manifest),
         "adapter": args.adapter,
-        "agent_command": command if args.adapter == "command" else None,
+        "agent_command": "[omitted]" if args.adapter == "command" else None,
         "total": len(results),
         "passed": passed,
         "failed": len(results) - passed,

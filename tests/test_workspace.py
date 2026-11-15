@@ -4,12 +4,30 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from bugfix_benchmark.models import BenchmarkCase
-from bugfix_benchmark.workspace import prepare_workspace
+from bugfix_benchmark.workspace import WorkspaceError, prepare_workspace
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_clone_failure_omits_url_and_subprocess_output(self) -> None:
+        case = BenchmarkCase.from_record({
+            "case_id": "case-1", "repository": "owner/repo",
+            "source_url": "https://secret-in-url@example.invalid/repo.git",
+            "base_commit": "abcdef", "problem_statement": "Fix bug.",
+            "fail_to_pass": ["false"],
+        })
+        failed = subprocess.CompletedProcess([], 1, stdout="secret-in-output")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("bugfix_benchmark.workspace.subprocess.run", return_value=failed):
+                with self.assertRaises(WorkspaceError) as caught:
+                    prepare_workspace(case, root / "workspace", root)
+        self.assertIn("cannot clone", str(caught.exception))
+        self.assertNotIn("secret-in-url", str(caught.exception))
+        self.assertNotIn("secret-in-output", str(caught.exception))
+
     def test_local_fixture_changes_are_visible_as_a_git_patch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

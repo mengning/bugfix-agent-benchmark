@@ -7,6 +7,9 @@ import subprocess
 import tempfile
 from threading import Thread
 import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError
+from io import BytesIO
 
 from bugfix_benchmark.models import BenchmarkCase
 from bugfix_benchmark.runtime_adapter import DevStarRuntimeAdapter
@@ -40,6 +43,18 @@ class RuntimeHandler(BaseHTTPRequestHandler):
 
 
 class DevStarRuntimeAdapterTests(unittest.TestCase):
+    def test_http_error_does_not_expose_response_body(self):
+        secret = "example-sensitive-response"
+        adapter = DevStarRuntimeAdapter(base_url="http://localhost", token="token",
+                                        workspace=Path("."))
+        failure = HTTPError("http://localhost", 403, "forbidden", {}, BytesIO(secret.encode()))
+        with patch("bugfix_benchmark.runtime_adapter.urlopen", side_effect=failure):
+            with self.assertRaises(RuntimeError) as caught:
+                adapter._request("GET", "/test")
+        self.assertIn("HTTP 403", str(caught.exception))
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertTrue(caught.exception.__suppress_context__)
+
     def test_dispatches_to_current_instance_and_reads_its_patch(self):
         RuntimeHandler.requests = []
         server = ThreadingHTTPServer(("127.0.0.1", 0), RuntimeHandler)
