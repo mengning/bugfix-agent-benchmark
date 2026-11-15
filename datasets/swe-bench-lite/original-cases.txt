@@ -1,0 +1,6 @@
+# Research examples from the upstream SWE-bench Lite test split.
+# Paper analysis: docs/BUGFIX_DATASET_SURVEY.md
+# Not an official leaderboard selection or an independently validated Bugfix suite.
+astropy__astropy-12907
+django__django-12700
+mwaskom__seaborn-3010

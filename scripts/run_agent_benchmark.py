@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from bugfix_benchmark.agent_runner import CommandAgentAdapter, command_from_string
+from bugfix_benchmark.runtime_adapter import runtime_adapter_from_environment
 from bugfix_benchmark.catalog import load_cases
 from bugfix_benchmark.runner import BenchmarkRunner, _new_run_id, _safe_name
 from bugfix_benchmark.verifier import verify_case
@@ -24,7 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
-    parser.add_argument("--agent-command", required=True)
+    parser.add_argument("--adapter", choices=("command", "devstar-runtime"), default="command")
+    parser.add_argument("--agent-command")
     parser.add_argument("--results-dir", type=Path, default=Path("results"))
     parser.add_argument("--run-id")
     parser.add_argument("--case", action="append", default=[], dest="cases")
@@ -51,14 +53,17 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         raise ValueError("no benchmark cases selected")
 
     run_id = args.run_id or _new_run_id()
-    run_dir = args.results_dir / run_id
+    run_dir = (args.results_dir / run_id).resolve()
     patches_dir = run_dir / "patches"
     cases_dir = run_dir / "cases"
     patches_dir.mkdir(parents=True, exist_ok=False)
     cases_dir.mkdir(parents=True, exist_ok=True)
-    command = command_from_string(args.agent_command)
+    if args.adapter == "command" and not args.agent_command:
+        raise ValueError("--agent-command is required for adapter=command")
+    command = command_from_string(args.agent_command) if args.adapter == "command" else []
     results: list[dict[str, object]] = []
-    for case in cases:
+    for index, case in enumerate(cases, 1):
+        print(f"[{index}/{len(cases)}] {case.case_id}: preparing workspace", flush=True)
         case_name = _safe_name(case.case_id)
         case_dir = cases_dir / case_name
         case_dir.mkdir(parents=True, exist_ok=True)
@@ -66,16 +71,24 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         case_file = case_dir / "case.json"
         artifact_file = case_dir / "artifact.json"
         try:
+            case_file.write_text(json.dumps(case.evaluation_payload(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             prepare_workspace(case, workspace, repository_root)
-            artifact = CommandAgentAdapter(
-                command=command,
-                case_file=case_file,
-                workspace=workspace,
-                artifact_file=artifact_file,
-                timeout_seconds=args.agent_timeout,
-            ).run(case)
+            if args.adapter == "devstar-runtime":
+                adapter = runtime_adapter_from_environment(workspace, timeout_seconds=args.agent_timeout)
+            else:
+                adapter = CommandAgentAdapter(
+                    command=command,
+                    case_file=case_file,
+                    workspace=workspace,
+                    artifact_file=artifact_file,
+                    timeout_seconds=args.agent_timeout,
+                )
+            print(f"[{index}/{len(cases)}] {case.case_id}: waiting for Agent", flush=True)
+            artifact = adapter.run(case)
+            artifact_file.write_text(json.dumps({"case_id": case.case_id, "patch": artifact.patch, "adapter": artifact.adapter, "metadata": artifact.metadata}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             patch_path = patches_dir / f"{case_name}.patch"
             patch_path.write_text(artifact.patch, encoding="utf-8")
+            print(f"[{index}/{len(cases)}] {case.case_id}: verifying patch", flush=True)
             result = verify_case(
                 case,
                 artifact,
@@ -93,6 +106,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 failure_reason=str(exc),
             )
         value = result.as_dict()
+        print(f"[{index}/{len(cases)}] {case.case_id}: {result.status}" + (f" — {result.failure_reason}" if result.failure_reason else ""), flush=True)
         results.append(value)
         (case_dir / "result.json").write_text(
             json.dumps(value, ensure_ascii=False, indent=2) + "\n",
@@ -103,8 +117,8 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     score: dict[str, object] = {
         "run_id": run_id,
         "manifest": str(args.manifest),
-        "adapter": "command",
-        "agent_command": command,
+        "adapter": args.adapter,
+        "agent_command": command if args.adapter == "command" else None,
         "total": len(results),
         "passed": passed,
         "failed": len(results) - passed,

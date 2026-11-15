@@ -9,7 +9,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from bugfix_benchmark.swebench import read_instance_ids, select_records, write_jsonl
+from bugfix_benchmark.swebench import official_cases, read_instance_ids, select_records, write_jsonl
+
+
+CASE_FIELDS = (
+    "instance_id", "repo", "base_commit", "problem_statement", "FAIL_TO_PASS", "PASS_TO_PASS"
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,16 +23,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dataset", default="SWE-bench/SWE-bench_Lite")
     parser.add_argument("--split", default="test")
-    parser.add_argument(
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--all", action="store_true", help="download the complete official split")
+    selection.add_argument(
         "--instances-file",
         type=Path,
-        default=Path("datasets/swe-bench-lite/sample-10.txt"),
+        help="download only IDs in this file (defaults to sample-10.txt)",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=Path(".benchmark/datasets/swe-bench-lite.jsonl"),
     )
+    parser.add_argument("--ids-output", type=Path, help="write selected instance IDs for grading")
     return parser
 
 
@@ -41,11 +49,25 @@ def main() -> int:
             "python3 -m pip install 'datasets>=2.14'"
         ) from exc
 
-    instance_ids = read_instance_ids(args.instances_file)
     dataset = load_dataset(args.dataset, split=args.split)
-    records = select_records((dict(item) for item in dataset), instance_ids)
-    write_jsonl(records, args.output)
-    print(f"wrote {len(records)} official cases to {args.output}")
+    records = [dict(item) for item in dataset]
+    if not args.all:
+        instance_ids = read_instance_ids(
+            args.instances_file or Path("datasets/swe-bench-lite/sample-10.txt")
+        )
+        records = select_records(records, instance_ids)
+    cases = official_cases(records)
+    public_records = [
+        {field: record[field] for field in CASE_FIELDS if field in record}
+        for record in records
+    ]
+    write_jsonl(public_records, args.output)
+    if args.ids_output:
+        args.ids_output.parent.mkdir(parents=True, exist_ok=True)
+        args.ids_output.write_text(
+            "".join(f"{case.case_id}\n" for case in cases), encoding="utf-8"
+        )
+    print(f"wrote {len(cases)} official cases to {args.output}")
     return 0
 
 

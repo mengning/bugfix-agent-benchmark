@@ -1,0 +1,83 @@
+locator	case_id	mechanism	context	selection_purpose
+live:cpp	fmtlib__fmt-4490	compatibility	library	Non-propagating allocator move semantics across inline and dynamic buffers
+live:cpp	KhronosGroup__glslang-4006	data_semantics	compiler	Small unsigned shader indices produce incorrect SPIR-V signedness
+live:cpp	shader-slang__slang-7864	state_propagation	compiler	Public enum symbols disappear across module boundaries
+live:cpp	alibaba__yalantinglibs-1002	recovery	service	RPC client reconnection to a different endpoint
+live:cpp	GothenburgBitFactory__taskwarrior-3911	state_propagation	cli	Edited task loses a report column under user-visible CLI flow
+live:go	openfga__openfga-2598	configuration	service	Secondary database plus metrics prevents service startup
+live:go	oauth2-proxy__oauth2-proxy-2524	compatibility	service	Alpha configuration regex rewrite regression in proxy upstreams
+live:go	ossf__scorecard-4728	compatibility	security	Release-signature check misses sigstore JSON artifact
+live:go	nats-io__nats-server-7089	security_contract	service	User-info response omits permissions across authentication server boundary
+live:rust	linebender__vello-1100	boundary	graphics	Clipping operation panics rather than rendering safely
+live:rust	uutils__coreutils-8447	boundary	cli	mktemp empty tmpdir option has incompatible behavior
+live:rust	uutils__coreutils-8528	compatibility	cli	Directory symbolic-link move diverges from GNU behavior
+live:rust	casey__just-2835	compatibility	cli	Module import behavior regresses existing justfiles
+live:rust	jtroo__kanata-1681	concurrency	interactive	Concurrent tap-hold input state differs from expected behavior
+live:ts	owid__owid-grapher-5115	data_semantics	frontend	Stacked chart interpolation is wrong for irregular time intervals
+live:ts	openai__openai-agents-js-340	compatibility	library	RunResult and RunState public TypeScript declarations disagree
+live:ts	firefox-devtools__profiler-5512	data_semantics	frontend	Marker stack tooltip uses function-start rather than frame line number
+live:ts	TanStack__router-4751	state_transition	frontend	Optional route parameter and static suffix select wrong parent
+live:ts	excalidraw__excalidraw-9760	boundary	frontend	Deleting all points in line editor throws
+live:js	MultiQC__MultiQC-3242	state_propagation	reporting	Grouped sections lose custom-content description
+live:js	sveltejs__svelte-16666	state_propagation	compiler	Awaited variable inside snippet is undefined at render
+live:js	sveltejs__svelte-16309	compatibility	frontend	Spread selected attribute is ignored by select element
+live:js	less__less.js-4349	compatibility	compiler	Dotted CSS layer name throws after Less regression
+live:java	opentripplanner__OpenTripPlanner-6732	boundary	service	Journey planning crashes on empty index in transit data
+live:java	wiremock__wiremock-3130	configuration	service	Global timeout CLI option parses to null and yields 500
+live:java	OpenAPITools__openapi-generator-21579	data_semantics	codegen	Generated Kotlin Spring enum query conversion fails for nondefault naming
+live:java	springdoc__springdoc-openapi-3051	data_semantics	library	Multipart RequestPart schema omits non-primitive types
+live:cs	dotnet__winforms-13797	state_propagation	desktop	Transparent background image rendering is broken
+live:cs	dotnet__orleans-9605	compatibility	service	JSON node type cast fails in distributed runtime
+live:cs	unoplatform__uno-20897	state_transition	desktop	Content dialog overlay state requires update
+multi:go/cli__cli_dataset.jsonl	cli__cli-10388	boundary	cli	HEAD response body is parsed when it should be ignored
+multi:go/cli__cli_dataset.jsonl	cli__cli-10364	validation	cli	Repository rename with owner-qualified name misbehaves
+multi:go/cli__cli_dataset.jsonl	cli__cli-10354	validation	cli	PR view fails when URL is supplied as input
+multi:go/cli__cli_dataset.jsonl	cli__cli-10074	state_transition	cli	Merge-queue branch deletion exits with error after merge
+multi:go/grpc__grpc-go_dataset.jsonl	grpc__grpc-go-3361	recovery	service	Balancer must recover when old endpoints disappear
+multi:go/grpc__grpc-go_dataset.jsonl	grpc__grpc-go-3258	recovery	service	DNS A-record lookup error must propagate instead of empty addresses
+multi:go/grpc__grpc-go_dataset.jsonl	grpc__grpc-go-3119	recovery	service	Load balancer enters fallback when no balancer address remains
+multi:go/grpc__grpc-go_dataset.jsonl	grpc__grpc-go-2630	state_transition	service	Drop only when a SubConn is ready
+multi:ts/vuejs__core_dataset.jsonl	vuejs__core-11899	compatibility	compiler	Nested CSS compilation handles at-rule and comment
+multi:ts/vuejs__core_dataset.jsonl	vuejs__core-11813	state_propagation	frontend	Computed getter receives previous value correctly
+multi:ts/vuejs__core_dataset.jsonl	vuejs__core-11761	state_propagation	frontend	Array subclass methods preserve reactive dependency tracking
+multi:ts/vuejs__core_dataset.jsonl	vuejs__core-11694	state_propagation	frontend	Directly nested ref inside reactive object behaves correctly
+multi:java/fasterxml__jackson-databind_dataset.jsonl	fasterxml__jackson-databind-4486	configuration	library	Unknown enum null behavior respects overriding configuration
+multi:java/fasterxml__jackson-databind_dataset.jsonl	fasterxml__jackson-databind-4468	data_semantics	library	Empty QName deserializes as empty rather than null
+multi:java/fasterxml__jackson-databind_dataset.jsonl	fasterxml__jackson-databind-4325	boundary	library	Throwable any-setter deserialization avoids null pointer
+multi:java/fasterxml__jackson-databind_dataset.jsonl	fasterxml__jackson-databind-4230	state_transition	library	ObjectNode findValue and findParent regression remains correct
+multi:java/google__gson_dataset.jsonl	google__gson-1555	state_propagation	library	Null-safe adapter usage preserves serialization contract
+multi:java/google__gson_dataset.jsonl	google__gson-1093	data_semantics	library	Lenient numeric writer handles NaN and infinity consistently
+multi:rust/nushell__nushell_dataset.jsonl	nushell__nushell-13870	recovery	cli	External command failure mid-pipeline should not raise wrong error
+multi:rust/nushell__nushell_dataset.jsonl	nushell__nushell-11948	data_semantics	cli	Raw JSON output removes unwanted whitespace
+multi:rust/nushell__nushell_dataset.jsonl	nushell__nushell-10395	boundary	cli	Too few arguments to custom function must not panic
+multi:rust/clap-rs__clap_dataset.jsonl	clap-rs__clap-5873	validation	cli	Ignore-errors parser reports correct source for suggestion
+multi:rust/clap-rs__clap_dataset.jsonl	clap-rs__clap-5527	validation	cli	Too-few arguments report correct arity
+multi:rust/clap-rs__clap_dataset.jsonl	clap-rs__clap-5520	configuration	cli	Exclusive argument correctly overrides required group
+multi:js/axios__axios_dataset.jsonl	axios__axios-5919	compatibility	library	Adapter loading provides the correct failure message
+multi:js/axios__axios_dataset.jsonl	axios__axios-5661	boundary	library	FormData detection avoids calling arbitrary toString method
+pro:0	instance_NodeBB__NodeBB-00c70ce7b0541cfc94afe567921d7668cdc8f4ac-vnan	state_propagation	service	Post cache initialization and slug existence diverge across modules
+pro:0	instance_NodeBB__NodeBB-04998908ba6721d64eba79ae3b65a351dcfbc5b5-vnan	state_transition	service	Email confirmation expiry and resend traverse cache and account state
+pro:0	instance_NodeBB__NodeBB-8168c6c40707478f71b8af60300830fe554c778c-vf2cf3cbd463b7ad942381f1c6d077626485a1e9e	security_contract	service	Uploaded cover and profile images remain after account deletion
+pro:80	instance_ansible__ansible-a02e22e902a69aeb465f16bf03f7f5a91b2cb828-vba6da65a0f3baefda7a058ebbd0a8dcafb8512f5	recovery	developer_tool	Galaxy collection installation fails when network is unavailable
+pro:80	instance_ansible__ansible-a7d2a4e03209cff1e97e59fd54bb2b05fdbdbec6-v0f01c69f1e2528b935359cfe578530722bca2c59	concurrency	developer_tool	Forked worker display messages are not deduplicated globally
+pro:160	instance_element-hq__element-web-cf3c899dd1f221aa1a1f4c5a80dffc05b9c21c85-vnan	state_propagation	frontend	Voice broadcast liveness icon disagrees with playback state
+pro:240	instance_flipt-io__flipt-ea9a2663b176da329b3f574da2ce2a664fc5b4a1	security_contract	service	Restricted users cannot access their permitted namespace list
+pro:320	instance_gravitational__teleport-2be514d3c33b0ae9188e11ac9975485c853d98bb-vce94f93ad1030e3136852817f2423c1b3ac37bc4	recovery	service	Reverse tunnel nodes fail to register fully under load
+pro:320	instance_gravitational__teleport-32bcd71591c234f0d8b091ec01f1f5cbfdc0f13c-vee9b09fb20c43af7e520f57e9239bbcf46b7113d	state_transition	security	Device enrollment loses information after reaching device limit
+pro:400	instance_internetarchive__openlibrary-5069b09e5f64428dce59b33455c8bb17fe577070-v8717e18970bcdc4e0d2cea3b1527752b21e74866	state_transition	service	Booknotes are deleted on conflicting work_id update
+pro:560	instance_qutebrowser__qutebrowser-16de05407111ddd82fa12e54389d532362489da9-v363c8a7e5ccdf6968fc7ab84a2053ac78036691d	compatibility	desktop	QtWebEngine locale interaction produces blank page and network crash
+pro:40	instance_ansible__ansible-1c06c46cc14324df35ac4f39a45fb3ccd602195d-v0f01c69f1e2528b935359cfe578530722bca2c59	security_contract	developer_tool	YAML filter trust propagation must preserve vault handling across pipeline
+pro:40	instance_ansible__ansible-3b823d908e8a5d17674f8c26d337d3114b7493b1-v0f01c69f1e2528b935359cfe578530722bca2c59	compatibility	developer_tool	Vars-file read optimization regresses existing behavior
+pro:120	instance_element-hq__element-web-459df4583e01e4744a52d45446e34183385442d6-vnan	state_transition	frontend	Starting a broadcast should stop active playback in another session
+pro:120	instance_element-hq__element-web-56c7fc1948923b4b3f3507799e725ac16bcf8018-vnan	state_transition	security	Cryptographic identity reset submits repeatedly before progress feedback
+pro:200	instance_flipt-io__flipt-84806a178447e766380cc66b14dee9c6eeb534f4	configuration	service	OCI storage backend config parsing and validation fail across layers
+pro:200	instance_flipt-io__flipt-8bd3604dc54b681f1f0f7dd52cbc70b3024184b6	recovery	service	Audit webhook panic makes entire server unavailable
+pro:280	instance_future-architect__vuls-9aa0d87a21bede91c2b45c32187456bb69455e92	compatibility	security	Image reference by digest is rejected in vulnerability scanner config
+pro:280	instance_future-architect__vuls-c11ba27509f733d7d280bdf661cbbe2e7a99df4c	data_semantics	security	Lockfile path is missing from vulnerability report
+pro:360	instance_gravitational__teleport-c1b1c6a1541c478d7777a48fca993cc8206c73b9	compatibility	service	Legacy unpacked session recording cannot play from audit log
+pro:360	instance_gravitational__teleport-c782838c3a174fdff80cafd8cd3b1aa4dae8beb2	state_propagation	service	Remote-cluster config cache diverges for pre-v7 clusters
+pro:360	instance_gravitational__teleport-e6d86299a855687b21970504fbf06f52a8f80c74-vce94f93ad1030e3136852817f2423c1b3ac37bc4	state_transition	security	User traits are stale after session renewal
+pro:440	instance_internetarchive__openlibrary-c506c1b0b678892af5cb22c1c1dbc35d96787a0a-v0f5aece3601a5b4419f7ccec1dbda2071be28ee4	data_semantics	cli	Function-to-CLI adapter mishandles list input and filesystem paths
+pro:440	instance_internetarchive__openlibrary-e1e502986a3b003899a8347ac8a7ff7b08cbfc39-v08d8e8889ec945ab821fb156c04c7d2e2810debb	state_transition	service	Book edit can lose complex table-of-contents data
+pro:520	instance_protonmail__webclients-3a6790f480309130b5d6332dce6c9d5ccca13ee3	state_propagation	frontend	Cached child-count accuracy in links listing
+pro:600	instance_qutebrowser__qutebrowser-a84ecfb80a00f8ab7e341372560458e3f9cfffa2-v2ef375ac784985212b1805e1d0431dc8f1b3c171	validation	desktop	Empty command input should report a dedicated error
