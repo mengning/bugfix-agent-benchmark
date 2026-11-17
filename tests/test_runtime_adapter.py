@@ -65,11 +65,10 @@ class DevStarRuntimeAdapterTests(unittest.TestCase):
                 workspace = Path(directory) / "workspace"
                 workspace.mkdir()
                 subprocess.run(["git", "init", "--quiet"], cwd=workspace, check=True)
-                case = BenchmarkCase.from_record({
-                    "case_id": "case-1", "repository": "owner/repo",
-                    "source_path": "fixture", "base_commit": "fixture-v1",
-                    "problem_statement": "Fix the bug", "fail_to_pass": ["false"],
-                })
+                case = BenchmarkCase(
+                    case_id="case-1", repository="owner/repo", base_commit="",
+                    problem_statement="Fix the bug", source_url="https://example.invalid/repo.git",
+                )
                 adapter = DevStarRuntimeAdapter(
                     base_url=f"http://127.0.0.1:{server.server_port}",
                     token="instance-secret", workspace=workspace, timeout_seconds=1,
