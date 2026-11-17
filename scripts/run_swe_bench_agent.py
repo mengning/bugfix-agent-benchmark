@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from bugfix_benchmark.agent_runner import CommandAgentAdapter, command_from_string
 from bugfix_benchmark.runtime_adapter import runtime_adapter_from_environment
-from bugfix_benchmark.runner import _new_run_id, _safe_name
+from bugfix_benchmark.naming import _new_run_id, _safe_name
 from bugfix_benchmark.swebench import official_cases, read_instance_ids, select_records, build_predictions, write_jsonl
 from bugfix_benchmark.workspace import prepare_workspace
 

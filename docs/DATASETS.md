@@ -1,98 +1,45 @@
-# Dataset Policy
+# 数据集与 Agent 接入说明
 
-## Dataset classes
+本文说明本框架的数据组织方式、隔离原则，以及如何接入待测的 Bugfix Agent。
 
-### Smoke fixtures
+---
 
-`datasets/smoke/` contains repository-owned fixtures that verify the benchmark
-runner, patch replay, and regression checks. Smoke results are not Bugfix Agent
-benchmark scores.
+## 一、数据集与防泄漏设计
 
-### Bugfix-v1
+本仓库主要基于 **SWE-bench Lite (`test`)** 进行评测：
 
-`datasets/bugfix-v1/` contains three original, repository-owned source
-fixtures with a reproducible failing test, passing regression tests, and a
-protected `tests/` directory per case. These cases are scored by
-`src/bugfix_benchmark/verifier.py`, not by the SWE-bench harness. Keep
-Bugfix-v1 scores separate from official SWE-bench results. Case descriptions,
-scope, and limitations are in `datasets/bugfix-v1/README.md`.
+* **固定题目与顺序**：`datasets/swe-bench-lite/full-300.txt` 固定了全部 300 个用例 ID 及执行顺序。
+* **不提交上游题库正文**：仓库内不直接存放参考补丁与测试用例内容，题目数据统一由 `scripts/fetch_swe_bench.py` 从上游拉取，评分结果由官方评分器运行生成。
 
-### SWE-bench Lite
+为防止测试答案泄漏给待测 Agent，拉取脚本将数据严格拆分为两份：
 
-`datasets/swe-bench-lite/` stores selected `instance_id` values from the
-official SWE-bench Lite test split. Case records are downloaded at runtime from:
+| 数据类型 | 生成参数 | 包含内容 | 存放位置要求 |
+| --- | --- | --- | --- |
+| **生成数据**（Agent 输入） | `--output` | 仅包含 Issue 描述、仓库与基准提交等公开字段，**不含参考修复与测试补丁** | 放在 Agent 可访问的工作区（如 `.benchmark/datasets/`） |
+| **评分数据**（Harness 输入） | `--scoring-output` | 包含参考补丁与官方测试套件的完整记录 | **仅保存在独立评分环境**，严禁放入 Agent 工作区 |
 
-- Dataset: <https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite>
-- Harness: <https://github.com/SWE-bench/SWE-bench>
+---
 
-The public repository does not copy upstream gold patches, test patches, or
-source repositories. Their licenses and usage terms remain governed by their
-respective upstream projects.
+## 二、接入自己的 Agent
 
-`sample-10.txt` and `sample-30.txt` are integration selections. They do not
-represent the full SWE-bench Lite suite and must not be reported as official
-leaderboard scores. `scripts/fetch_swe_bench.py --all` downloads the complete
-300-case test split into the ignored `.benchmark/` directory.
+运行器支持通过 `--adapter` 接入不同形态的 Agent，目前提供 **DevStar 实例模式** 与 **命令行模式** 两种方式。
 
-`full-300.txt` freezes the complete Lite `test` ID set for official comparison.
-`screened-v2.txt` is an 84-case **provisional** diagnostic pool produced by
-`scripts/build_swe_lite_selection.py`; `reviewed-v2.txt` currently contains
-the same 84 IDs. `case-inventory-v2.jsonl` gives a selection or hold reason
-for every one of the 300 upstream cases: 84 paper-reviewed inclusions,
-33 review holds, and 183 rule-based exclusions that have not been individually
-reviewed. Some included records still flag target-test assertion checks.
-The [dataset README](../datasets/swe-bench-lite/README.md) defines the rules,
-provenance, distribution, and reporting limits. Neither the 84-case pool nor
-the older seven-case set can be compared as a Lite leaderboard result.
+### 方式 1：接入 DevStar 中的 Agent（`--adapter devstar-runtime`）
 
-`diagnostic-v1.txt` is a separate seven-case capability-oriented selection.
-Its reviewed labels and inference limits are in `diagnostic-v1.jsonl`; the
-[dataset README](../datasets/swe-bench-lite/README.md) gives the runnable flow.
-Only official SWE-bench harness results may be used for its score breakdown.
-Core cases and issue-information controls must be reported separately. This
-selection does not replace or approximate the full 300-case leaderboard.
+适用于已在 DevStar 平台部署并以 Agent Team 实例形式运行的 Agent。
 
-`original-cases.txt` is a separate research selection of three upstream cases.
-The [survey](BUGFIX_DATASET_SURVEY.md) records their repository context,
-defect mechanism, capability hypotheses, and limits of those interpretations.
-The selection is not an independently reproduced or statistically representative
-Bugfix benchmark; it uses the same official-data acquisition path as other
-SWE-bench Lite selections.
+#### 接入要求
+1. **Agent 侧**：支持接收 `/evaluate-case` 任务，读取派发的用例信息与临时工作区，并在结果 `artifact` 中返回匹配的 `case_id` 与非空 `patch`（标准 unified diff）。
+2. **平台侧**：DevStar 实例环境需注入 `DEVSTAR_TOKEN` 与 `DEVSTAR_PLATFORM_URL`（或 `DEVSTAR_BASE_URL`），并提供以下接口：
+   - `POST /-/agent-services/instances/dispatch`：向当前实例（`target_self=true`）派发 `/evaluate-case` 任务。
+   - `GET /-/agent-services/events/{event_id}/result`：轮询任务状态并读取结果中的 `artifact`。
 
-### Cross-source case research
+#### 运行命令
+在已启动待测 Agent 实例的 **Web Terminal** 中执行：
 
-[The multi-source selection rationale](MULTI_SOURCE_SELECTION.md) compares
-the construction goals of issue-to-patch, historical bug-pair, CI-derived,
-and specialized benchmark sources. The case-candidates.jsonl file under
-datasets/cross-source records evidence and selection purposes for the first
-candidates. This is a research inventory, not a runnable manifest or a scored
-dataset: no case has yet passed source-specific historical baseline and
-reference-fix replay.
-
-The [scenario-oriented candidate design](SCENARIO_BENCHMARK_DESIGN.md)
-reorganizes the research inventory by defect mechanism, task span, and
-operational context. Its 176-case pool includes 84 existing Lite paper reviews
-and external metadata-screened records; no case is promoted to a cross-source
-scored suite by that expansion. The `long_task_proxy` label is based on
-reference-patch file count and issue length, not a validated Agent horizon.
-
-## Reproducibility requirements
-
-Every public evaluation set must record:
-
-1. dataset name, version, and provenance (upstream or repository-owned);
-2. stable case identifiers and source revision or committed fixture version;
-3. failing and passing baseline checks;
-4. protected paths and independent scoring rules;
-5. acquisition script when cases are downloaded from upstream;
-6. scorer or official harness version used for the run.
-
-Generated datasets, cloned repositories, predictions, logs, and scores belong
-under `.benchmark/` or `results/` and are not committed.
-
-## Adding another dataset
-
-Add a directory under `datasets/` with a README describing provenance. For
-repository-owned cases, commit minimal source fixtures and tests; for upstream
-cases, keep selection metadata here and add a deterministic acquisition script
-under `scripts/`. Keep dataset-specific grading separate from Agent invocation.
+```bash
+python3 scripts/run_swe_bench_agent.py \
+  --dataset-file .benchmark/datasets/swe-bench-lite-test.jsonl \
+  --adapter devstar-runtime \
+  --model-name <your-agent-name> \
+  --run-id <your-run-id>

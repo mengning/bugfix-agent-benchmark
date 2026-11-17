@@ -37,7 +37,7 @@ class PublicScriptTests(unittest.TestCase):
 
     def test_batch_script_exposes_agent_command_cli(self) -> None:
         completed = subprocess.run(
-            [sys.executable, str(ROOT / "scripts/run_agent_benchmark.py"), "--help"],
+            [sys.executable, str(ROOT / "scripts/run_swe_bench_agent.py"), "--help"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -45,7 +45,7 @@ class PublicScriptTests(unittest.TestCase):
 
         self.assertEqual(0, completed.returncode, completed.stdout)
         self.assertIn("--agent-command", completed.stdout)
-        self.assertIn("--manifest", completed.stdout)
+        self.assertIn("--dataset-file", completed.stdout)
 
 
 if __name__ == "__main__":

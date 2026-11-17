@@ -37,10 +37,6 @@ class DevStarRuntimeAdapter:
         if not self.workspace.is_dir() or not (self.workspace / ".git").exists():
             raise RuntimeError(f"prepared case workspace is not a Git repository: {self.workspace}")
         payload = case.evaluation_payload()
-        # Local fixtures use a symbolic baseline. The runner prepared the exact
-        # workspace already; the Agent should not attempt to resolve the marker.
-        if case.source_path:
-            payload["base_commit"] = ""
         response = self._request("POST", "/-/agent-services/instances/dispatch", {
             "target_self": True,
             "command": "/evaluate-case",

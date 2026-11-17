@@ -12,17 +12,9 @@ from bugfix_benchmark.models import BenchmarkCase
 PATCH = "diff --git a/calc.py b/calc.py\n--- a/calc.py\n+++ b/calc.py\n"
 
 
-def make_case(source_path: str = "fixture") -> BenchmarkCase:
-    return BenchmarkCase.from_record(
-        {
-            "case_id": "case-1",
-            "repository": "smoke/case-1",
-            "source_path": source_path,
-            "base_commit": "fixture",
-            "problem_statement": "Fix the bug.",
-            "fail_to_pass": ["python3 -m unittest"],
-        }
-    )
+def make_case() -> BenchmarkCase:
+    return BenchmarkCase(case_id="case-1", repository="owner/repo", base_commit="abc123",
+                         problem_statement="Fix the bug.", source_url="https://example.invalid/repo.git")
 
 
 class CommandAgentAdapterTests(unittest.TestCase):

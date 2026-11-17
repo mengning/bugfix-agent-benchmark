@@ -1,5 +1,5 @@
-"""Independent Bugfix Agent benchmark harness."""
+"""SWE-bench patch generation and official scoring helpers."""
 
-from .models import AgentArtifact, BenchmarkCase, CaseResult
+from .models import AgentArtifact, BenchmarkCase
 
-__all__ = ["AgentArtifact", "BenchmarkCase", "CaseResult"]
+__all__ = ["AgentArtifact", "BenchmarkCase"]
