@@ -1,0 +1,32 @@
+{
+  "benchmark_version": "swe-bench-lite-test",
+  "dataset": {
+    "name": "SWE-bench/SWE-bench_Lite",
+    "split": "test",
+    "revision": "b0dde1093fe417d83b7184254edf8199c1f0dff5",
+    "instances_file": "datasets/swe-bench-lite/full-300.txt",
+    "agent_input_file": ".benchmark/datasets/swe-bench-lite-test.jsonl",
+    "scoring_input_file": ".benchmark/scoring/swe-lite-full-input.jsonl",
+    "scoring_dataset_file": ".benchmark/scoring/swe-lite-full.json"
+  },
+  "run": {
+    "run_id": "swe-lite-full",
+    "results_dir": "results",
+    "model_name": "bugfix-agent"
+  },
+  "agent": {
+    "adapter": "command",
+    "command": "python3 -m bugfix_agent.evaluate",
+    "pythonpath_env": "AGENT_REPO_PATH",
+    "default_agent_repo_path": "/opt/bugfix-agent",
+    "env_map": {
+      "BUGFIXAGENT_LLM_API_KEY": "LLM_API_KEY",
+      "BUGFIXAGENT_LLM_BASE_URL": "LLM_BASE_URL",
+      "BUGFIXAGENT_LLM_MODEL": "LLM_MODEL"
+    }
+  },
+  "grading": {
+    "max_workers": 1,
+    "allow_empty": true
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "SWE-bench Lite scoring",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "mounts": [
+    "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock"
+  ]
+}
