@@ -22,24 +22,17 @@
 
 ## 二、接入自己的 Agent
 
-运行器支持通过 `--adapter` 接入不同形态的 Agent，目前提供 **DevStar 实例模式** 与 **命令行模式** 两种方式。
+Benchmark 以子进程启动配置中的 Agent 命令，并通过以下环境变量传递输入和产物路径。
 
-### 方式 1：接入 DevStar 中的 Agent（`--adapter devstar-runtime`）
+| 环境变量 | 用途 |
+| --- | --- |
+| `BENCHMARK_CASE_ID` | 题目 ID |
+| `BENCHMARK_CASE_FILE` | 题目 JSON 文件路径 |
+| `BENCHMARK_WORKSPACE` | 基准源码目录 |
+| `BENCHMARK_ARTIFACT_FILE` | 补丁产物 JSON 文件路径 |
 
-适用于已在 DevStar 平台部署并以 Agent Team 实例形式运行的 Agent。
+Agent 将包含非空 `patch` 的 JSON 写入产物路径，以退出码 `0` 结束。补丁使用 unified diff 格式。
 
-#### 接入要求
-1. **Agent 侧**：支持接收 `/evaluate-case` 任务，读取派发的用例信息与临时工作区，并在结果 `artifact` 中返回匹配的 `case_id` 与非空 `patch`（标准 unified diff）。
-2. **平台侧**：DevStar 实例环境需注入 `DEVSTAR_TOKEN` 与 `DEVSTAR_PLATFORM_URL`（或 `DEVSTAR_BASE_URL`），并提供以下接口：
-   - `POST /-/agent-services/instances/dispatch`：向当前实例（`target_self=true`）派发 `/evaluate-case` 任务。
-   - `GET /-/agent-services/events/{event_id}/result`：轮询任务状态并读取结果中的 `artifact`。
+用 [默认配置](../configs/swe-bench-lite.json) 作为模板，将 `agent.command` 改成你的 Agent 命令，按需配置 `agent.env_map`、`dataset.instances_file` 和 `run.run_id`。无需映射模型变量时，可把 `agent.env_map` 设为 `{}`。在三个阶段的命令上使用同一个 `--config <路径>`，并按 README 交接文件。
 
-#### 运行命令
-在已启动待测 Agent 实例的 **Web Terminal** 中执行：
-
-```bash
-python3 scripts/run_swe_bench_agent.py \
-  --dataset-file .benchmark/datasets/swe-bench-lite-test.jsonl \
-  --adapter devstar-runtime \
-  --model-name <your-agent-name> \
-  --run-id <your-run-id>
+显式参数优先于自定义配置，自定义配置只需包含要覆盖的字段。可以运行各脚本的 `--help` 查看参数。

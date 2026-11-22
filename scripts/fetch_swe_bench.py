@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from bugfix_benchmark.swebench import official_cases, read_instance_ids, select_records, write_jsonl
+from bugfix_benchmark.defaults import read_config
 
 
 CASE_FIELDS = (
@@ -21,10 +22,11 @@ CASE_FIELDS = (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Download selected cases from the official SWE-bench dataset."
+        description="Download SWE-bench Lite cases. With no arguments, export all 300 Agent inputs."
     )
-    parser.add_argument("--dataset", default="SWE-bench/SWE-bench_Lite")
-    parser.add_argument("--split", default="test")
+    parser.add_argument("--config", type=Path, help="benchmark JSON configuration")
+    parser.add_argument("--dataset")
+    parser.add_argument("--split")
     parser.add_argument("--revision", help="immutable Hugging Face dataset revision")
     parser.add_argument("--source-json", type=Path, help="load a full local dataset snapshot instead of Hugging Face")
     parser.add_argument("--expected-sha256", help="verify the local snapshot's SHA-256 before loading")
@@ -38,7 +40,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(".benchmark/datasets/swe-bench-lite.jsonl"),
     )
     parser.add_argument("--ids-output", type=Path, help="write selected instance IDs for grading")
     parser.add_argument(
@@ -49,7 +50,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.config or not sys.argv[1:]:
+        dataset = read_config(parser, args.config)["dataset"]
+        if not args.source_json and args.dataset in (None, dataset["name"]):
+            args.revision = args.revision or dataset["revision"]
+        args.dataset = args.dataset or dataset["name"]
+        args.split = args.split or dataset["split"]
+        if not args.all:
+            args.instances_file = args.instances_file or Path(dataset["instances_file"])
+        args.output = args.output or Path(dataset["agent_input_file"])
+    args.dataset = args.dataset or "SWE-bench/SWE-bench_Lite"
+    args.split = args.split or "test"
+    args.output = args.output or Path(".benchmark/datasets/swe-bench-lite.jsonl")
     outputs = [path.resolve() for path in (args.output, args.ids_output, args.scoring_output) if path]
     if len(outputs) != len(set(outputs)):
         raise ValueError("Agent input, instance IDs and scoring output must use different files")

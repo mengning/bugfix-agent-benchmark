@@ -1,132 +1,114 @@
+
+
+
 # Bugfix Agent Benchmark
 
-基于 DevStar 评测 Agent 代码修复能力的基准框架：固定拉取 SWE-bench Lite 题目与基准源码，调用待测 Agent 生成补丁，再使用 SWE-bench 官方评分器独立验证。
-
-**主流程：准备两个环境 → 固定代码与数据版本 → 生成全部补丁 → 官方评分 → 查看结果。**
+基于 DevStar 评测 Agent 代码修复能力的基准框架：在 Agent 容器内调用待测 Agent 生成 SWE-bench Lite（300 题）补丁，再通过 Benchmark 开发容器接入 DevStar 服务器 Docker 运行官方评分。
 
 ---
 
 ## 版本与基准范围
 
-| 项目 | 固定配置 |
+| 项目 | 配置 |
 | --- | --- |
-| **数据集** | SWE-bench Lite `test`（共 300 题） |
+| **数据集** | SWE-bench Lite `test`（300 题，固定顺序见 [full-300.txt](datasets/swe-bench-lite/full-300.txt)） |
 | **数据集版本（revision）** | `b0dde1093fe417d83b7184254edf8199c1f0dff5` |
+| **默认配置文件** | `configs/swe-bench-lite.json` |
 | **官方评分器** | `swebench==4.1.0` |
 | **本框架版本** | `v0.1.0` |
-| **示例 Agent 版本** | Bugfix Agent `v0.1.0`（仓库地址：`https://devstar.cn/devstar-agents/bugfix-agent`） |
+| **示例 Agent 版本** | [Bugfix Agent `v0.1.0`](https://devstar.cn/devstar-agents/bugfix-agent)（提交 `d899c02da93d3161fd6eb51566c8a3a216a67e84`） |
 
-> **参考基线**：使用示例 Bugfix Agent `v0.1.0` 搭配 `DeepSeek-V4.1-Flash-1017`在本框架上的参考成绩为 **（70.0% RESOLVED）**。详细数据与口径说明见 [Bugfix Agent 仓库说明](<https://devstar.cn/devstar-agents/bugfix-agent>)。
+> **参考基线**：示例 Bugfix Agent `v0.1.0` 搭配 `DeepSeek-V4.1-Flash-1017`（单题上限 32 次调用）单次全量运行通过 **210 / 300（70.0%）**。详情见 [Bugfix Agent 仓库说明](https://devstar.cn/devstar-agents/bugfix-agent)。
 
 ---
 
-## 一、准备环境
+## 一、DevStar 容器分工
 
-评测分为 **生成补丁** 与 **官方评分** 两个阶段，建议使用两个独立环境（评分数据包含标准答案和测试补丁，不应放在 Agent 可访问的工作区中）。
+补丁生成与官方评分在 DevStar 上使用两个独立容器，也防止生成阶段接触评分数据与缓存：
 
-| 环境 | 职责 | 最低要求 |
+| 入口 | 容器配置来源 | 用途 |
 | --- | --- | --- |
-| **生成环境**（DevStar Agent 实例） | 拉取题目描述、调用 Agent 生成补丁 | Python 3.9+、Git、可访问 GitHub/数据集与源码 |
-| **评分环境**（独立机器/容器） | 运行官方测试并给出最终评分 | **Python 3.10+**、运行中的 Docker、可拉取 SWE-bench 官方镜像 |
+| `Agent Team → Bugfix Agent 实例 → >_` | Bugfix Agent 仓库模板 | 打开 Benchmark 工作区，由 Benchmark 直接启动 Agent 子进程生成补丁 |
+| `Benchmark 仓库 → 开发容器 → Web Terminal` | 本仓库 `.devcontainer` | 接入 DevStar 服务器 Docker，导出题库并运行 SWE-bench 官方评分 |
 
-### 在 DevStar 中配置生成环境
-
-1. **导入本仓库**：在 DevStar 选择 **迁移外部仓库**，导入本仓库地址。
-2. **配置模型**：进入导入后仓库的 **设置 → AI 设置**，配置你有权使用的模型服务与 API Key。
-3. **启动待测 Agent**：在仓库的 **Agent Team** 中启动待测 Bugfix Agent，确认实例状态为**在线**。
-   - 若使用平台内置的示例 Bugfix Agent，请核对当前环境对应 `v0.1.0` 版本；
-   - 若评测自定义 Agent，需确保其支持 `/evaluate-case` 指令，并接入 DevStar 实例派发与结果接口。
-4. **进入终端并锁定框架版本**：打开该 Agent 实例的 **Web Terminal**，进入 `bugfix-agent-benchmark` 根目录，切换到固定 Release 版本：
-
-   ```bash
-   git fetch --tags
-   git checkout <BENCHMARK_TAG>
-   ```
+两容器通过管理员配置的共享交接目录传递题目输入和补丁产物；包含参考补丁和测试补丁的评分数据仅保留在开发容器中。
 
 ---
 
-## 二、拉取数据并生成全量补丁
+## 二、准备环境与版本
 
-在 **DevStar Agent 的 Web Terminal** 中执行（确保与评分数据隔离）：
+1. **导入仓库与配置模型**：在 DevStar 选择 **迁移外部仓库** 导入本仓库，进入 **设置 → AI 设置** 配置模型服务与 API Key（示例 Agent `v0.1.0` 要求模型 ID 填 `deepseek-flash`）。
+2. **打开两个终端**：
+   - **Agent 终端**：进入 `Agent Team → Bugfix Agent v0.1.0 → >_`（或你的自定义 Agent 实例）。
+   - **评分终端**：进入 `Benchmark 仓库 → 开发容器 → Web Terminal`，确认 Python ≥ 3.10 且 `docker info` 返回服务器 `Server` 信息。
+3. **检出 `v0.1.0` 并确认评分依赖**：在两个终端各自的 `bugfix-agent-benchmark` 根目录执行：
 
 ```bash
-# 1. 安装数据拉取依赖
-python3 -m pip install -e '.[datasets]'
-
-# 2. 按固定 revision 下载 300 题（仅含题目描述和基准信息，不含测试答案）
-python3 scripts/fetch_swe_bench.py \
-  --revision b0dde1093fe417d83b7184254edf8199c1f0dff5 \
-  --instances-file datasets/swe-bench-lite/full-300.txt \
-  --output .benchmark/datasets/swe-bench-lite-test.jsonl
-
-# 3. 运行全量 300 题生成补丁
-python3 scripts/run_swe_bench_agent.py \
-  --dataset-file .benchmark/datasets/swe-bench-lite-test.jsonl \
-  --adapter devstar-runtime \
-  --model-name bugfix-agent \
-  --run-id swe-lite-full
+git fetch --no-tags https://github.com/mengning/bugfix-agent-benchmark.git refs/tags/v0.1.0 && git checkout --detach FETCH_HEAD
 ```
 
-> **提示**：
-> - `--model-name` 仅作为结果记录标签，实际模型由 DevStar 的 AI 设置决定。
-> - 若想先跑 1 题快速验证通路是否正常，可在第 3 步命令中追加 `--max-cases 1` 并改用独立 `--run-id`。
-> - **中断续跑**：确认原进程已停止后，用相同参数在末尾追加 `--resume`（已生成非空补丁的题目会自动跳过）；若需重试失败任务，先确认 DevStar 中对应事件已停止，再使用 `--resume --retry-failed`。
+若 `.devcontainer` 镜像未预装评分依赖，在 **评分终端** 执行：
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate && pip install -e '.[datasets]' 'swebench==4.1.0'
+```
 
 ---
 
-## 三、运行官方评分
+## 三、执行全量 300 题测评
 
-在**独立评分环境**中检出同一 `<BENCHMARK_TAG>` 版本的本仓库，将生成环境产出的 `results/swe-lite-full/` 目录复制过来，然后执行：
+以下 3 条命令的默认参数（数据集 revision、300 题清单、Agent 入口、产物目录与环境变量映射）均读取自 `configs/swe-bench-lite.json`：
+
+### 1. 准备题目｜评分终端
 
 ```bash
-# 1. 安装评分器并检查 Docker
-python3 -m pip install -e '.[datasets]' 'swebench==4.1.0'
-docker info
+python3 scripts/fetch_swe_bench.py
+```
 
-# 2. 下载包含测试套件的官方评分数据（勿复制到 Agent 工作区）
-python3 scripts/fetch_swe_bench.py \
-  --revision b0dde1093fe417d83b7184254edf8199c1f0dff5 \
-  --instances-file datasets/swe-bench-lite/full-300.txt \
-  --output .benchmark/datasets/agent-input.jsonl \
-  --scoring-output .benchmark/scoring/swe-bench-lite-test.json
+按固定 revision 导出 300 道不含答案的题目到 `.benchmark/datasets/swe-bench-lite-test.jsonl`。通过共享交接目录将该文件复制到 **Agent 终端** 相同相对路径。
 
-# 3. 执行官方评分（可根据机器 CPU/内存适当调大 --max-workers）
-python3 scripts/grade_swe_bench.py \
-  --dataset .benchmark/scoring/swe-bench-lite-test.json \
-  --instances-file results/swe-lite-full/instances.txt \
-  --patch-dir results/swe-lite-full/patches \
-  --model-name bugfix-agent \
-  --run-id swe-lite-full \
-  --max-workers 1 \
-  --allow-empty
+### 2. 生成补丁｜Agent 终端
 
-# 4. 查看评分汇总
+```bash
+python3 scripts/run_swe_bench_agent.py
+```
+
+使用 DevStar 注入的模型配置逐题拉起 Agent 子进程生成补丁，产出写入 `results/swe-lite-full/`。运行结束后，将 `results/swe-lite-full/instances.txt` 与 `results/swe-lite-full/patches/` 复制到 **评分终端** 相同相对路径。
+
+### 3. 官方评分｜评分终端
+
+```bash
+python3 scripts/grade_swe_bench.py
+```
+
+评分脚本根据本轮 `instances.txt` 准备官方评分数据，通过 DevStar 服务器 Docker 自动拉取缺少的镜像并运行测试容器，最终输出 `results/swe-lite-full/score.json`。
+
+> **常用选项**：
+> - 中断续跑：在第 2 步后追加 `--resume`；
+> - 指定其他配置或自定义 Agent：使用 `--config <路径>`、`--agent-command '<命令>'` 或对应命令行参数覆盖默认值（见 `docs/DATASETS.md`）。
+
+---
+
+## 四、查看结果与自检
+
+在 **评分终端** 查看总分（关注 `passed`、`total` 与 `pass_rate`，以官方 `resolved` 状态为准）：
+
+```bash
 python3 -m json.tool results/swe-lite-full/score.json
 ```
 
-评分器会拉取或复用官方测试镜像、应用补丁并运行目标测试与回归测试：`resolved` 表示通过，`unresolved` 表示已评分但未全部通过；空补丁与评分异常会单独记录。
-
----
-
-## 四、查看与记录结果
-
 | 产出路径 | 说明 |
 | --- | --- |
-| `results/swe-lite-full/run.json` | Agent 生成状态、数据文件 SHA-256 与运行参数 |
+| `results/swe-lite-full/score.json` | 官方评分汇总与逐题状态 |
+| `results/swe-lite-full/run.json` | 本轮运行参数与逐题补丁生成状态 |
 | `results/swe-lite-full/patches/` | 逐题生成的修复补丁 |
-| `results/swe-lite-full/score.json` | 官方评分汇总（`passed`、`total`、`pass_rate`）与逐题状态 |
-| `logs/evaluation/swe-lite-full/` | 官方评分完整测试输出与逐题 `report.json` |
+| `results/swe-lite-full/cases/` | 逐题输入、Agent 产物与执行记录 |
+| `logs/run_evaluation/swe-lite-full/<model-name>/<instance_id>/` | SWE-bench 4.1.0 逐题 `report.json` 与 `test_output.txt` |
 
-对外发布或对比测评结果时，建议一并记录：**Benchmark 版本、Agent 版本、DevStar 版本、模型与供应商、单题调用预算、数据集 revision、评分器版本（`swebench==4.1.0`）**。
-
----
-
-## 开发与自检
-
-运行仓库内置单元测试：
+运行框架内置单元测试：
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-通过命令行 adapter 接入其他外部 Agent 的说明，见 [数据与接入说明](docs/DATASETS.md)。
+自定义 Agent 接入约定与离线数据快照用法见 [数据与接入说明](docs/DATASETS.md)。
